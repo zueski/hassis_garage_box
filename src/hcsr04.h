@@ -4,6 +4,6 @@
 #ifndef _HCSR04_H
 #define _HCSR04_H
 
-double getDist(double lastTemperature);
+double getDistance(double temperature);
 
 #endif

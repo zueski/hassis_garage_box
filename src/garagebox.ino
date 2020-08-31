@@ -29,16 +29,42 @@ void ICACHE_RAM_ATTR osWatch(void)
 	}
 }
 
-
-
 // temp sensor
 DHTesp dht;
-double lastTemperature = 25.0d;
-// relaystate
-int relay1state = 0;
+
+// store last values
+static unsigned long last_sensor;
+double lastTemperature = 0.0;
+double lastHumidity = 0;
+double lastDistance = 0.0;
+int lastCarPresent = 0;
 
 ESP8266WebServer server(80);   //instantiate server at port 80 (http port)
 
+// 
+void handleTempSensor()
+{
+	float humidity = dht.getHumidity();
+	float temperature = dht.getTemperature();
+	lastTemperature = (double) temperature;
+	lastHumidity = (double) humidity;
+	Serial.print("Temp: ");
+	Serial.println(temperature);
+	Serial.print("Humid: ");
+	Serial.println(humidity);
+	// call MQTT publish
+}
+
+void handleDistSensor()
+{
+	double distance = getDistance(lastTemperature);
+	int carPresent = (distance < CAR_PRESENT_CM_THREASHOLD) ? 1 : 0;
+	if(carPresent != lastCarPresent)
+	{
+		// call MQTT with new state
+	}
+	lastCarPresent = carPresent;
+}
 // MQTT handlers
 
 
@@ -74,45 +100,34 @@ void setup()
 	server.on("/", []()
 		{
 			//Report the current status of the device
-			server.send(200, "text/plain", "hellow");
-		}
-	);
-	server.on("/temp", []()
-		{
-			// Print temperature sensor details.
-			float humidity = dht.getHumidity();
-			float temperature = dht.getTemperature();
 			char body[1024];
-			sprintf(body,  "<html> <head>   <title>ESP8266 Page</title> <meta name='viewport' content='width=device-width, initial-scale=1.0'>  <style>     h1 {text-align:center; }     td {font-size: 50%; padding-top: 30px;}     .temp {font-size:150%; color: #FF0000;}     .press {font-size:150%; color: #00FF00;}     .hum {font-size:150%; color: #0000FF;}   </style> </head>  <body>    <h1>ESP8266 Sensor Page</h1>    <div id='div1'>        <table>           <tr>            <td>Temperature</td><td class='temp'>%.2f</td>          </tr>          <tr>   <td>Humidity</td><td class='hum'>%.2f</td>  </tr> </div> </body>  </html>", temperature, humidity);
-			server.send(200, "text/html", body);
-			lastTemperature = (double) temperature;
-		}
-	);
-	
-	server.on("/dist", []()
-		{
-			// Get the time the ultrasonic pulses took from the sensor to the blocking object
-			//int hitTime = ultrasonicSensor.getHitTime();
-			// Calculate the approximate distance in centimeters (as seen in extras/HC-SR04.txt)
-			//int distanceInCm = hitTime / 29;
-			//double* distance = HCSR04.measureDistanceCm();
-			double dist = getDist(lastTemperature);
-			char body[1024];
-			sprintf(body,  "<html> <head>   <title>ESP8266 Page</title> <meta name='viewport' content='width=device-width, initial-scale=1.0'>  <style>     h1 {text-align:center; }     td {font-size: 50%; padding-top: 30px;}     .temp {font-size:150%; color: #FF0000;}     .press {font-size:150%; color: #00FF00;}     .hum {font-size:150%; color: #0000FF;}   </style> </head>  <body>    <h1>ESP8266 Sensor Page</h1>    <div id='div1'>        <table>           <tr><td>Distance in cm</td><td class='temp'>%.2f</td>  </tr> </div> </body>  </html>", dist);
+			sprintf(body,  "<html><head><title>Garage Status Page</title></head><body>"
+							"<h1>Garage Status Page</h1><div id='div1'><table>"
+							"<tr><td>Temperature</td><td class='temp'>%.1f</td></tr>"
+							"<tr><td>Humidity</td><td class='hum'>%.1f</td></tr>"
+							"<tr><td>Car present</td><td class='hum'>%i</td></tr>"
+							"</table></div></body></html>", lastTemperature, lastHumidity, lastCarPresent);
 			server.send(200, "text/html", body);
 		}
 	);
-	
+		
 	server.begin();
 }
 
 void loop(void)
 {
-	last_loop = millis(); // checkin with watchdog
-	digitalWrite(LLED, LOW);
+	// checkin with watchdog
+	last_loop = millis(); 
+	if(last_sensor + 30000L < last_loop)
+	{
+		// turn on the activity light
+		digitalWrite(LLED, LOW); 
+		last_sensor = last_loop;
+		handleTempSensor();
+		handleDistSensor();
+		// turn off the activity light
+		digitalWrite(LLED, HIGH);
+	}
 	server.handleClient();
-	//digitalWrite(RELAY1, !digitalRead(RELAY1));
-	//digitalWrite(RELAY2, !digitalRead(RELAY1));
-	digitalWrite(LLED, HIGH);
-	delay(10000);
+	delay(500);
 }

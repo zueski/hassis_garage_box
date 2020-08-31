@@ -13,4 +13,6 @@
 
 #define OSWATCH_RESET_TIME_MS 90000
 
+#define CAR_PRESENT_CM_THREASHOLD 150
+
 #endif

@@ -1,6 +1,6 @@
 #include "hcsr04.h"
 
-double getDist(double lastTemperature)
+double getDistance(double temperature)
 {
 	int dist = -1;
 	unsigned long start = -1;
@@ -35,7 +35,7 @@ double getDist(double lastTemperature)
 	}
 	//delaytime = pulseIn(DISTECHO, HIGH);
 
-	double speedOfSoundInCmPerMs = 0.03313 + 0.0000606 * lastTemperature; // Cair ≈ (331.3 + 0.606 ⋅ ϑ) m/s
+	double speedOfSoundInCmPerMs = 0.03313 + 0.0000606 * temperature; // Cair ≈ (331.3 + 0.606 ⋅ ϑ) m/s
 	double distanceCm = delaytime / 2.0 * speedOfSoundInCmPerMs;
 	return distanceCm;
 }
